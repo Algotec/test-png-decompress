@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test PNG Decompress</title>
+</head>
+<body>
+    <button id="run">Run Test</button>
+    <span id="log"></span><br/>
+    <canvas id="canvas" width="514px" height="514px"></canvas>
+</body>
+<script>
+    document.getElementById("run").onclick = function () {
+
+    	let TEST_NUM_IMAGES = 100;
+	    let totalLoadImageTime = 0;
+	    let totalDecompressDrawTime = 0;
+	    let cache = [];
+	    let canvasElem = document.getElementById("canvas");
+	    let context = canvasElem.getContext("2d");
+
+	    log("loading...");
+	    loadImages(function () {
+		    log("decompressing...");
+		    createImages(function () {
+			    log("drawing...");
+		    	drawImages(function () {
+				    let averageLoadImageTime = (totalLoadImageTime / TEST_NUM_IMAGES).toFixed(2);
+				    let averageDecompressDrawTime = (totalDecompressDrawTime / TEST_NUM_IMAGES).toFixed(2);
+				    log("On average, img.src = URL took: " + averageLoadImageTime + " ms, compress + draw took: " + averageDecompressDrawTime);
+			    }, 0);
+            }, 0);
+	    }, 0);
+
+	    function log (logString) {
+		    document.getElementById("log").innerText = logString;
+	    }
+
+	    //  Load and cache image blob's
+	    function loadImages (finishedCallback, index) {
+		    let xhr = new XMLHttpRequest();
+		    xhr.open("GET", "BMP01.png", true);
+		    xhr.responseType = "blob";
+		    xhr.setRequestHeader("Cache-Control", "no-cache, no-store");
+		    xhr.onload = function() {
+			    cache[index] = { url: URL.createObjectURL(xhr.response), img: undefined};
+			    index++;
+			    // log("loaded " + loadIndex + " images");
+			    if (index < TEST_NUM_IMAGES) {
+				    loadImages(finishedCallback, index);
+			    } else {
+				    finishedCallback();
+			    }
+		    };
+		    xhr.send();
+	    }
+
+	    //  create Image objects from loaded blob's
+	    function createImages (finishedCallback, index) {
+		    let img = new Image();
+            let startTime = performance.now();
+		    img.onload = function() {
+		    	totalLoadImageTime += (performance.now() - startTime);
+			    cache[index].img = img;
+		    	index++;
+			    if (index < TEST_NUM_IMAGES) {
+				    createImages(finishedCallback, index);
+			    } else {
+				    finishedCallback();
+			    }
+		    };
+		    img.src = cache[index].url;
+	    }
+
+	    //  Draw images to canvas - force the browser to decompress the images
+	    function drawImages(finishCallback, index) {
+	    	requestAnimationFrame(function () {
+			    let startTime = performance.now();
+			    context.drawImage(cache[index].img, 0, 0);
+			    setTimeout(function () {
+				    totalDecompressDrawTime += performance.now() - startTime;
+				    index++;
+				    if (index < TEST_NUM_IMAGES) {
+					    drawImages(finishCallback, index);
+				    } else {
+					    finishCallback();
+				    }
+			    }, 0);
+		    });
+        }
+    }
+
+</script>
+</html>
